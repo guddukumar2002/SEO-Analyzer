@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import axios from 'axios'
 
 function App() {
   const [url, setUrl] = useState('')
@@ -8,177 +9,205 @@ function App() {
   const [error, setError] = useState('')
 
   const analyzeSite = async () => {
+    if (!url.trim()) {
+      setError('Please enter a website URL')
+      return
+    }
+
     setLoading(true)
     setError('')
-    
+    setResult(null)
+
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/analyze?url=${encodeURIComponent(url)}`
-      )
-      const data = await response.json()
-      setResult(data)
+      // Use proxy via vite.config.js or direct backend URL
+      const response = await axios.get(`/api/analyze?url=${encodeURIComponent(url)}`)
+      setResult(response.data)
     } catch (err) {
-      setError('Analysis failed. Make sure backend is running on port 5000.')
+      setError(err.response?.data?.error || 'Failed to analyze. Is the backend running?')
     }
-    
+
     setLoading(false)
   }
 
-  // Inline styles
-  const styles = {
-    app: {
-      maxWidth: '800px',
-      margin: '0 auto',
-      padding: '2rem',
-      fontFamily: 'Arial, sans-serif'
-    },
-    title: {
-      color: 'white',
-      marginBottom: '0.5rem'
-    },
-    subtitle: {
-      color: '#e0e0e0',
-      marginBottom: '2rem'
-    },
-    inputSection: {
-      display: 'flex',
-      gap: '1rem',
-      marginBottom: '2rem'
-    },
-    urlInput: {
-      flex: '1',
-      padding: '0.75rem 1rem',
-      fontSize: '1rem',
-      border: '2px solid #ddd',
-      borderRadius: '8px',
-      outline: 'none'
-    },
-    analyzeBtn: {
-      padding: '0.75rem 2rem',
-      background: '#007bff',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      fontSize: '1rem',
-      fontWeight: 'bold',
-      cursor: 'pointer'
-    },
-    disabledBtn: {
-      background: '#ccc',
-      cursor: 'not-allowed'
-    },
-    error: {
-      background: '#ffebee',
-      color: '#c62828',
-      padding: '1rem',
-      borderRadius: '8px',
-      marginBottom: '1rem',
-      borderLeft: '4px solid #c62828'
-    },
-    result: {
-      background: 'white',
-      border: '1px solid #e0e0e0',
-      borderRadius: '12px',
-      padding: '2rem',
-      marginTop: '2rem',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-      color: 'black'
-    },
-    score: {
-      fontSize: '1.5rem',
-      fontWeight: 'bold',
-      marginBottom: '0.5rem'
-    },
-    scoreSpan: {
-      color: '#007bff',
-      fontSize: '2rem'
-    },
-    scoreBar: {
-      height: '20px',
-      background: '#f0f0f0',
-      borderRadius: '10px',
-      overflow: 'hidden',
-      marginTop: '1rem'
-    },
-    scoreFill: {
-      height: '100%',
-      background: 'linear-gradient(90deg, #4caf50, #8bc34a)',
-      transition: 'width 0.5s ease'
-    },
-    instructions: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      padding: '1.5rem',
-      borderRadius: '8px',
-      marginTop: '2rem',
-      color: 'white'
-    },
-    note: {
-      background: '#fff3cd',
-      border: '1px solid #ffc107',
-      color: '#856404',
-      padding: '0.75rem',
-      borderRadius: '6px',
-      marginTop: '1rem'
+  const getScoreColor = (score) => {
+    if (score >= 80) return '#10b981'
+    if (score >= 60) return '#f59e0b'
+    return '#ef4444'
+  }
+
+  const getGradeColor = (grade) => {
+    switch (grade) {
+      case 'A+': case 'A': return '#10b981'
+      case 'B': return '#f59e0b'
+      case 'C': case 'D': return '#f97316'
+      default: return '#ef4444'
     }
   }
 
+  const prefillUrl = (prefilledUrl) => {
+    setUrl(prefilledUrl)
+    setTimeout(() => analyzeSite(), 100)
+  }
+
   return (
-    <div style={styles.app}>
-      <h1 style={styles.title}>🔍 SEO Analyzer Tool</h1>
-      <p style={styles.subtitle}>WooRank Clone - Enter website URL to analyze</p>
-      
-      <div style={styles.inputSection}>
-        <input
-          type="text"
-          placeholder="https://example.com"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          style={styles.urlInput}
-        />
-        <button 
-          onClick={analyzeSite} 
-          disabled={loading || !url}
-          style={loading || !url ? {...styles.analyzeBtn, ...styles.disabledBtn} : styles.analyzeBtn}
-        >
-          {loading ? 'Analyzing...' : 'Analyze SEO'}
-        </button>
-      </div>
-      
-      {error && <div style={styles.error}>{error}</div>}
-      
-      {result && (
-        <div style={styles.result}>
-          <h2>Results for: {result.url}</h2>
-          <div style={{margin: '1.5rem 0'}}>
-            <div style={styles.score}>SEO Score: <span style={styles.scoreSpan}>{result.score}/100</span></div>
-            <div style={styles.scoreBar}>
-              <div 
-                style={{...styles.scoreFill, width: `${result.score}%`}}
-              ></div>
+    <div className="app">
+      <header className="header">
+        <h1>🔍 SEO Analyzer Pro</h1>
+        <p className="subtitle">A complete Woorank clone for professional website analysis</p>
+      </header>
+
+      <main className="main">
+        {/* INPUT SECTION */}
+        <div className="card input-section">
+          <h2>Analyze Your Website</h2>
+          <p>Enter any website URL to get a detailed SEO report</p>
+
+          <div className="input-group">
+            <input
+              type="text"
+              placeholder="https://example.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && analyzeSite()}
+              disabled={loading}
+            />
+            <button onClick={analyzeSite} disabled={loading}>
+              {loading ? 'Analyzing...' : 'Analyze SEO'}
+            </button>
+          </div>
+
+          <div className="quick-tests">
+            <p>Try these test sites:</p>
+            <div className="test-buttons">
+              {['https://httpbin.org/html', 'https://example.com', 'https://stackoverflow.com'].map(testUrl => (
+                <button key={testUrl} className="test-btn" onClick={() => prefillUrl(testUrl)}>
+                  {new URL(testUrl).hostname}
+                </button>
+              ))}
             </div>
           </div>
-          <p>{result.message}</p>
-          
-          <div style={{background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '1.5rem'}}>
-            <p>✅ Backend running: http://localhost:5000</p>
-            <p>📊 Test: <a href="http://localhost:5000/api/health" target="_blank">Health Check</a></p>
-          </div>
+
+          {error && <div className="error-message">⚠️ {error}</div>}
         </div>
-      )}
-      
-      {!result && (
-        <div style={styles.instructions}>
-          <h3>How to use:</h3>
-          <ol>
-            <li>Enter any website URL (e.g., https://google.com)</li>
-            <li>Click "Analyze SEO" button</li>
-            <li>Wait for results</li>
-          </ol>
-          <div style={styles.note}>
-            <strong>Note:</strong> Make sure backend server is running
+
+        {/* LOADING STATE */}
+        {loading && (
+          <div className="card loading-card">
+            <div className="spinner"></div>
+            <h3>Analyzing {url}</h3>
+            <p>Checking meta tags, headings, images, technical SEO, and more...</p>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* RESULTS */}
+        {result && (
+          <div className="results-container">
+            {/* HEADER */}
+            <div className="card result-header">
+              <h2>SEO Report for <span className="report-url">{result.url}</span></h2>
+              <p className="report-date">Analyzed on {new Date(result.analyzedAt).toLocaleString()}</p>
+            </div>
+
+            {/* OVERALL SCORE */}
+            <div className="card score-card">
+              <div className="score-display">
+                <div className="score-circle" style={{ borderColor: getScoreColor(result.score) }}>
+                  <span className="score-number">{result.score}</span>
+                  <span className="score-label">/100</span>
+                </div>
+                <div className="score-info">
+                  <h3>Overall SEO Score</h3>
+                  <div className="grade" style={{ color: getGradeColor(result.grade) }}>
+                    Grade: <strong>{result.grade}</strong>
+                  </div>
+                  <div className="score-stats">
+                    <div className="stat">
+                      <span className="stat-value">{result.statistics.passedChecks}</span>
+                      <span className="stat-label">Passed</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-value">{result.statistics.failedChecks}</span>
+                      <span className="stat-label">Failed</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-value">{result.statistics.totalChecks}</span>
+                      <span className="stat-label">Total</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RECOMMENDATIONS */}
+            {result.recommendations.length > 0 && (
+              <div className="card recommendations-card">
+                <h3>💡 Recommendations</h3>
+                <ul className="recommendations-list">
+                  {result.recommendations.map((rec, idx) => (
+                    <li key={idx}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* DETAILED CHECKS */}
+            <div className="card checks-card">
+              <h3>Detailed Analysis ({result.checks.length} checks performed)</h3>
+              <div className="checks-grid">
+                {result.checks.map((check, idx) => (
+                  <div key={idx} className={`check-item ${check.passed ? 'passed' : 'failed'}`}>
+                    <div className="check-header">
+                      <span className="check-name">{check.name}</span>
+                      <span className="check-status">{check.passed ? '✅' : '❌'}</span>
+                    </div>
+                    <div className="check-category">{check.category}</div>
+                    <div className="check-value">{check.value}</div>
+                    <div className="check-weight">Weight: {check.weight} points</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* DETAILS */}
+            <div className="card details-card">
+              <h3>Technical Details</h3>
+              <div className="details-grid">
+                <div className="detail-item">
+                  <strong>Title:</strong>
+                  <span>{result.details.meta.title}</span>
+                </div>
+                <div className="detail-item">
+                  <strong>Description:</strong>
+                  <span>{result.details.meta.description}</span>
+                </div>
+                <div className="detail-item">
+                  <strong>H1 Tags:</strong>
+                  <span>{result.details.headings.headings.h1.length} found</span>
+                </div>
+                <div className="detail-item">
+                  <strong>Images:</strong>
+                  <span>{result.details.images.total} total, {result.details.images.missingAlt} missing alt</span>
+                </div>
+                <div className="detail-item">
+                  <strong>Word Count:</strong>
+                  <span>{result.details.onpage.wordCount} words</span>
+                </div>
+                <div className="detail-item">
+                  <strong>HTTPS:</strong>
+                  <span className={result.details.technical.checks.find(c => c.name === 'HTTPS/SSL')?.passed ? 'good' : 'bad'}>
+                    {result.details.technical.checks.find(c => c.name === 'HTTPS/SSL')?.passed ? 'Yes ✅' : 'No ❌'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className="footer">
+        <p>SEO Analyzer Pro v1.0 | Woorank Clone | Built for Assessment</p>
+        <p className="footer-note">Backend running on port 5000 | Frontend on port 5173</p>
+      </footer>
     </div>
   )
 }
