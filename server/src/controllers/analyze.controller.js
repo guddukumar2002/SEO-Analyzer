@@ -1,68 +1,130 @@
-const crawlerService = require('../services/crawler.service');
-const analyzerService = require('../services/analyzer.service');
+const seoService = require('../services/seo.service');
 const scoreService = require('../services/score.service');
+const Analysis = require('../models/Analysis');
 
-const analyzeController = {
-  getHealth: (req, res) => {
-    res.json({
-      status: 'operational',
-      service: 'SEO Analyzer Pro API',
-      version: '1.0.0',
-      timestamp: new Date().toISOString()
-    });
-  },
-
-  analyzeWebsite: async (req, res) => {
+exports.analyzeWebsite = async (req, res) => {
     try {
-      const { url } = req.query;
-
-      if (!url) {
-        return res.status(400).json({
-          error: 'Please provide a URL. Example: /api/analyze?url=https://example.com'
-        });
-      }
-
-      console.log(`▶️  Analysis requested for: ${url}`);
-
-      // STEP 1: Fetch the website HTML
-      const html = await crawlerService.fetchHTML(url);
-
-      // STEP 2: Run all SEO analysis
-      const analysisResults = analyzerService.analyze(html, url);
-
-      // STEP 3: Calculate score and recommendations
-      const scoreResult = scoreService.calculate(analysisResults);
-
-      // STEP 4: Prepare final response
-      const response = {
-        success: true,
-        url: url,
-        analyzedAt: new Date().toISOString(),
-        score: scoreResult.score,
-        grade: scoreResult.grade,
-        checks: scoreResult.checks,
-        recommendations: scoreResult.recommendations,
-        statistics: scoreResult.stats,
-        details: {
-          meta: analysisResults.meta,
-          headings: analysisResults.headings,
-          images: analysisResults.images,
-          technical: analysisResults.technical,
-          onpage: analysisResults.onpage
+        const { url } = req.body;
+        
+        console.log(`▶️  Analysis requested for: ${url}`);
+        
+        if (!url) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'URL is required' 
+            });
         }
-      };
-
-      res.json(response);
-
+        
+        // Validate URL format
+        let formattedUrl = url.trim();
+        if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+            formattedUrl = 'https://' + formattedUrl;
+        }
+        
+        try {
+            new URL(formattedUrl);
+        } catch (error) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid URL format' 
+            });
+        }
+        
+        // Check if analysis already exists (cache for 1 hour)
+        const existingAnalysis = await Analysis.findOne({ 
+            url: formattedUrl,
+            createdAt: { 
+                $gt: new Date(Date.now() - 60 * 60 * 1000) // 1 hour cache
+            }
+        });
+        
+        if (existingAnalysis) {
+            console.log(`✅ Serving cached analysis for: ${formattedUrl}`);
+            return res.json({
+                success: true,
+                url: formattedUrl,
+                analysis: existingAnalysis.analysis,
+                scores: existingAnalysis.scores,
+                cached: true,
+                timestamp: existingAnalysis.createdAt
+            });
+        }
+        
+        // Perform analysis
+        const analysis = await seoService.analyzeWebsite(formattedUrl);
+        const scores = scoreService.calculateOverallScore(analysis);
+        
+        // Save to database
+        const newAnalysis = new Analysis({
+            url: formattedUrl,
+            analysis,
+            scores,
+            createdAt: new Date()
+        });
+        
+        await newAnalysis.save();
+        
+        console.log(`✅ Analysis completed for: ${formattedUrl}`);
+        
+        res.json({
+            success: true,
+            url: formattedUrl,
+            analysis,
+            scores,
+            cached: false,
+            timestamp: new Date().toISOString()
+        });
+        
     } catch (error) {
-      console.error('❌ Analysis error:', error.message);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        suggestion: 'Please try a different URL like https://httpbin.org/html'
-      });
+        console.error('❌ Analysis error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Analysis failed', 
+            details: error.message 
+        });
     }
-  }
 };
 
-module.exports = analyzeController;
+exports.getAnalysisHistory = async (req, res) => {
+    try {
+        const analyses = await Analysis.find()
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .select('url scores.overall createdAt');
+        
+        res.json({
+            success: true,
+            count: analyses.length,
+            analyses
+        });
+    } catch (error) {
+        console.error('History fetch error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch history' 
+        });
+    }
+};
+
+// Simple test endpoint
+exports.testEndpoint = (req, res) => {
+    res.json({
+        message: 'SEO Analyzer API is working!',
+        endpoints: {
+            analyze: 'POST /api/analyze',
+            history: 'GET /api/history',
+            health: 'GET /api/health'
+        },
+        timestamp: new Date().toISOString()
+    });
+};
+
+// Health check
+exports.healthCheck = (req, res) => {
+    res.json({
+        status: 'healthy',
+        service: 'SEO Analyzer API',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+};
