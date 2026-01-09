@@ -6,7 +6,6 @@ const { URL } = require('url');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000; // ✅ ADDED PORT DEFINITION
 
 // ✅ Vercel ke liye CORS FIX
 app.use((req, res, next) => {
@@ -14,13 +13,21 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 
 app.use(express.json({ limit: '10mb' }));
 
-// ✅ MongoDB Connection - Fixed for Vercel
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://gk13212_db_user:6dVQU0ewWav2SXSb@cluster0.tcztiad.mongodb.net/seo-analyzer')
+// ✅ MongoDB Connection - Vercel compatible
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://gk13212_db_user:6dVQU0ewWav2SXSb@cluster0.tcztiad.mongodb.net/seo-analyzer';
+
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
 .then(() => console.log('✅ MongoDB Connected to Atlas'))
 .catch(err => console.log('❌ MongoDB Error:', err.message));
 
@@ -539,9 +546,14 @@ app.get('/', (req, res) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`
+// ✅ Vercel ke liye: module.exports karna hai
+module.exports = app;
+
+// ✅ Local development ke liye
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`
 ╔════════════════════════════════════════════════════════════════════╗
 ║                    🚀 SEO ANALYZER PRO v2.0                        ║
 ║                   Professional Woorank Clone                       ║
@@ -563,5 +575,6 @@ app.listen(PORT, () => {
 ║  💼 Different scores for different websites!                      ║
 ║                                                                    ║
 ╚════════════════════════════════════════════════════════════════════╝
-    `);
-});
+        `);
+    });
+}

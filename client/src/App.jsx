@@ -10,7 +10,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_BASE = "https://seo-analyzer-backend-19sjvoes0-guddu-kumars-projects-9014a0ff.vercel.app";
 
   const analyzeWebsite = async (e) => {
     e.preventDefault();
