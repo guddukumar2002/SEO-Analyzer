@@ -6,8 +6,9 @@ const { URL } = require('url');
 require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 3000; // ✅ ADDED PORT DEFINITION
 
-// ✅ Vercel ke liye CORS FIX - YEH LINE ADD KARO
+// ✅ Vercel ke liye CORS FIX
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -18,11 +19,8 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 
-// ✅ MongoDB Connection - Vercel compatible
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://gk13212_db_user:6dVQU0ewWav2SXSb@cluster0.tcztiad.mongodb.net/seo-analyzer', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+// ✅ MongoDB Connection - Fixed for Vercel
+mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://gk13212_db_user:6dVQU0ewWav2SXSb@cluster0.tcztiad.mongodb.net/seo-analyzer')
 .then(() => console.log('✅ MongoDB Connected to Atlas'))
 .catch(err => console.log('❌ MongoDB Error:', err.message));
 
