@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Analyzer Pro - Woorank Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .input-section {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #fcc;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .score-display {
+            text-align: center;
+        }
+        
+        .score-number {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: #10b981;
+        }
+        
+        .score-grade {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #059669;
+            background: #d1fae5;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        
+        .score-category {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .category-item {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .category-name {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        
+        .category-score {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px;
+        }
+        
+        .strengths-weaknesses {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .strength-list, .weakness-list {
+            list-style: none;
+        }
+        
+        .strength-list li, .weakness-list li {
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .strength-list li {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .weakness-list li {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .recommendations {
+            background: #f0f9ff;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .recommendations h3 {
+            color: #0369a1;
+            margin-bottom: 15px;
+        }
+        
+        .recommendations ul {
+            list-style: none;
+        }
+        
+        .recommendations li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e0f2fe;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .recommendations li:last-child {
+            border-bottom: none;
+        }
+        
+        .history-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 20px;
+        }
+        
+        .history-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+        
+        .history-url {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .history-score {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #10b981;
+        }
+        
+        .examples {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .example-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .example-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        
+        @media (max-width: 768px) {
+            .strengths-weaknesses {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-section {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 SEO Analyzer Pro</h1>
+            <p>Professional SEO analysis tool like Woorank.com</p>
+        </div>
+        
+        <div class="card">
+            <h2 style="margin-bottom: 20px;">Analyze Any Website</h2>
+            <div class="input-section">
+                <input type="text" id="urlInput" placeholder="https://example.com">
+                <button id="analyzeBtn" onclick="analyzeWebsite()">Analyze SEO</button>
+            </div>
+            
+            <div class="examples">
+                <span style="color: #666; font-size: 14px;">Try these examples:</span>
+                <button class="example-btn" onclick="setExample('https://google.com')">Google.com</button>
+                <button class="example-btn" onclick="setExample('https://github.com')">GitHub.com</button>
+                <button class="example-btn" onclick="setExample('https://stackoverflow.com')">StackOverflow</button>
+                <button class="example-btn" onclick="setExample('https://example.com')">Example.com</button>
+            </div>
+            
+            <div id="errorContainer" style="display: none;"></div>
+            
+            <div id="loading" style="display: none;" class="loading">
+                <p>🔍 Analyzing website... Please wait 5-10 seconds</p>
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">Fetching data and calculating SEO scores...</p>
+            </div>
+        </div>
+        
+        <div id="resultContainer" style="display: none;" class="card">
+            <!-- Results will be inserted here -->
+        </div>
+        
+        <div class="history-section">
+            <h2>📚 Recent Analyses</h2>
+            <div id="historyList" class="history-list">
+                <p style="text-align: center; color: #666; padding: 20px;">No analysis history yet</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        function setExample(url) {
+            document.getElementById('urlInput').value = url;
+        }
+        
+        async function analyzeWebsite() {
+            const url = document.getElementById('urlInput').value.trim();
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const errorContainer = document.getElementById('errorContainer');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            if (!url) {
+                showError('Please enter a website URL');
+                return;
+            }
+            
+            // Show loading, hide results and errors
+            loading.style.display = 'block';
+            resultContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Analyzing...';
+            
+            try {
+                console.log('Sending request to:', `${API_BASE}/api/analyze`);
+                const response = await fetch(`${API_BASE}/api/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                console.log('Response received:', data);
+                
+                if (data.success) {
+                    displayResults(data);
+                    loadHistory();
+                } else {
+                    showError(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showError('Cannot connect to server. Make sure backend is running on port 5000');
+            } finally {
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = 'Analyze SEO';
+            }
+        }
+        
+        function displayResults(data) {
+            const resultContainer = document.getElementById('resultContainer');
+            
+            // Calculate grade color
+            const gradeColor = getGradeColor(data.scores.grade);
+            
+            // Create score breakdown HTML
+            let scoreBreakdown = '';
+            if (data.scores.categoryScores) {
+                Object.entries(data.scores.categoryScores).forEach(([category, score]) => {
+                    const displayName = category.charAt(0).toUpperCase() + category.slice(1);
+                    scoreBreakdown += `
+                        <div class="category-item">
+                            <div class="category-name">${displayName}</div>
+                            <div class="category-score">${Math.round(score)}</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${score}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Create strengths list
+            let strengthsList = '';
+            if (data.strengths && data.strengths.length > 0) {
+                data.strengths.forEach(strength => {
+                    strengthsList += `<li>✅ ${strength}</li>`;
+                });
+            } else {
+                strengthsList = '<li>No specific strengths identified</li>';
+            }
+            
+            // Create weaknesses list
+            let weaknessesList = '';
+            if (data.weaknesses && data.weaknesses.length > 0) {
+                data.weaknesses.forEach(weakness => {
+                    weaknessesList += `<li>⚠️ ${weakness}</li>`;
+                });
+            } else {
+                weaknessesList = '<li>No major weaknesses found</li>';
+            }
+            
+            // Create recommendations list
+            let recommendationsList = '';
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(rec => {
+                    recommendationsList += `<li>📌 ${rec}</li>`;
+                });
+            } else {
+                recommendationsList = '<li>No recommendations available</li>';
+            }
+            
+            resultContainer.innerHTML = `
+                <div class="result-header">
+                    <div>
+                        <h2>SEO Analysis Results</h2>
+                        <p style="color: #666; margin-top: 5px;">${data.url}</p>
+                    </div>
+                    <div class="score-display">
+                        <div class="score-number" style="color: ${gradeColor}">${data.scores.overall}</div>
+                        <div class="score-grade" style="background-color: ${gradeColor}20; color: ${gradeColor}">
+                            ${data.scores.grade}
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 15px;">Score Breakdown</h3>
+                <div class="score-category">
+                    ${scoreBreakdown}
+                </div>
+                
+                <div class="strengths-weaknesses">
+                    <div>
+                        <h3 class="section-title">✅ Strengths</h3>
+                        <ul class="strength-list">
+                            ${strengthsList}
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="section-title">⚠️ Weaknesses</h3>
+                        <ul class="weakness-list">
+                            ${weaknessesList}
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="recommendations">
+                    <h3>📋 Recommendations</h3>
+                    <ul>
+                        ${recommendationsList}
+                    </ul>
+                </div>
+                
+                ${data.note ? `<p style="margin-top: 20px; color: #666; font-size: 14px;">Note: ${data.note}</p>` : ''}
+            `;
+            
+            resultContainer.style.display = 'block';
+        }
+        
+        function getGradeColor(grade) {
+            switch(grade) {
+                case 'A+':
+                case 'A':
+                case 'A-': return '#10b981'; // Green
+                case 'B+':
+                case 'B':
+                case 'B-': return '#3b82f6'; // Blue
+                case 'C+':
+                case 'C':
+                case 'C-': return '#f59e0b'; // Yellow
+                case 'D+':
+                case 'D': return '#f97316'; // Orange
+                case 'F': return '#ef4444'; // Red
+                default: return '#6b7280'; // Gray
+            }
+        }
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `
+                <div class="error">
+                    ❌ ${message}
+                </div>
+            `;
+            errorContainer.style.display = 'block';
+        }
+        
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/history`);
+                const data = await response.json();
+                
+                const historyList = document.getElementById('historyList');
+                
+                if (data.success && data.history && data.history.length > 0) {
+                    let historyHTML = '';
+                    data.history.forEach(item => {
+                        const gradeColor = getGradeColor(item.scores?.grade);
+                        historyHTML += `
+                            <div class="history-item">
+                                <div>
+                                    <div class="history-url">${item.domain || item.url}</div>
+                                    <div style="font-size: 12px; color: #666;">${new Date(item.timestamp).toLocaleString()}</div>
+                                </div>
+                                <div class="history-score" style="color: ${gradeColor}">
+                                    ${item.scores?.overall || 'N/A'}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    historyList.innerHTML = historyHTML;
+                } else {
+                    historyList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No analysis history yet</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+        
+        // Load history on page load
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>

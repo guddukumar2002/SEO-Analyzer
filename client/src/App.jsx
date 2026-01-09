@@ -1,983 +1,750 @@
-import React, { useState } from "react";
-import axios from "axios";
-import "./App.css";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './App.css';
 
 function App() {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
+  const [history, setHistory] = useState([]);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const analyzeWebsite = async () => {
-    if (!url) {
-      setError("Please enter a URL");
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  const analyzeWebsite = async (e) => {
+    e.preventDefault();
+    if (!url.trim()) {
+      setError('Please enter a URL');
       return;
     }
 
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setActiveTab('overview');
+
     try {
-      setLoading(true);
-      setError("");
-      setResult(null);
-
-      console.log("🔍 Starting analysis for:", url);
-
-      // Try multiple endpoints in case one fails
-      const endpoints = [
-        "http://localhost:5000/api/analyze", // New direct endpoint
-        "http://localhost:5000/api/analysis/analyze", // Original endpoint
-        "/api/analyze", // Proxy endpoint if using vite proxy
-      ];
-
-      let response = null;
-      let lastError = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`);
-          response = await axios.post(
-            endpoint,
-            {
-              url: url.startsWith("http") ? url : `https://${url}`,
-            },
-            {
-              timeout: 30000, // 30 second timeout
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (response.data) {
-            console.log(`✅ Success with endpoint: ${endpoint}`);
-            break;
-          }
-        } catch (err) {
-          lastError = err;
-          console.log(`❌ Failed with ${endpoint}:`, err.message);
-          continue;
-        }
-      }
-
-      if (!response) {
-        throw new Error(
-          `All endpoints failed. Last error: ${lastError?.message || "Unknown"}`
-        );
-      }
-
-      console.log("✅ API Response:", response.data);
-
-      if (!response.data.success && response.data.error) {
-        throw new Error(response.data.error);
-      }
-
-      setResult(response.data);
-    } catch (err) {
-      console.error("❌ API Error:", err);
-
-      let errorMessage = "Analysis failed";
-
-      if (err.response) {
-        // Server responded with error status
-        errorMessage = `Server Error (${err.response.status}): `;
-        if (err.response.data && typeof err.response.data === "object") {
-          errorMessage +=
-            err.response.data.error ||
-            err.response.data.message ||
-            JSON.stringify(err.response.data);
-        } else {
-          errorMessage += err.response.data || "Unknown error";
-        }
-      } else if (err.request) {
-        // Request was made but no response
-        errorMessage = "No response from server. Please check:";
-        errorMessage +=
-          "\n1. Is backend server running? (Run: cd server && npm start)";
-        errorMessage += "\n2. Check if port 5000 is available";
-        errorMessage += "\n3. Check console for backend errors";
+      const response = await axios.post(`${API_BASE}/api/analyze`, { url });
+      
+      if (response.data.success) {
+        setResult(response.data);
+        fetchHistory();
       } else {
-        // Something happened in setting up the request
-        errorMessage = `Request Error: ${err.message}`;
+        setError(response.data.error || 'Analysis failed');
       }
-
-      setError(errorMessage);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Server error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Test backend connection
-  const testBackendConnection = async () => {
+  const fetchHistory = async () => {
     try {
-      const response = await axios.post("http://localhost:5000/api/analyze", {
-        url: url.startsWith("http") ? url : `https://${url}`,
-      });
-      alert(
-        `✅ Backend is running!\nStatus: ${response.data.status}\nService: ${response.data.service}`
-      );
+      const response = await axios.get(`${API_BASE}/api/history`);
+      if (response.data.success) {
+        setHistory(response.data.data);
+      }
     } catch (err) {
-      alert(
-        `❌ Backend is NOT running!\nError: ${err.message}\n\nPlease start backend first:\ncd server\nnpm start`
-      );
+      console.error('Failed to fetch history');
     }
   };
 
-  // Safe rendering functions
-  const renderScoreCard = () => {
-    if (!result || !result.scores || result.scores.overall === undefined) {
-      return (
-        <div className="score-card">
-          <h2>Overall SEO Score</h2>
-          <div className="score-circle" style={{ background: "#ccc" }}>
-            <span className="score-value">N/A</span>
-          </div>
-          <p className="score-grade">No score available</p>
-        </div>
-      );
-    }
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
-    const score = result.scores.overall;
-    let grade = "";
-    let gradeColor = "#666";
-
-    if (score >= 90) {
-      grade = "Excellent";
-      gradeColor = "#28a745";
-    } else if (score >= 70) {
-      grade = "Good";
-      gradeColor = "#17a2b8";
-    } else if (score >= 50) {
-      grade = "Fair";
-      gradeColor = "#ffc107";
-    } else {
-      grade = "Needs Improvement";
-      gradeColor = "#dc3545";
-    }
-
-    return (
-      <div className="score-card">
-        <h2>Overall SEO Score</h2>
-        <div
-          className="score-circle"
-          style={{
-            background: `linear-gradient(135deg, ${gradeColor} 0%, ${gradeColor}80 100%)`,
-          }}
-        >
-          <span className="score-value">{score}/100</span>
-        </div>
-        <p
-          className="score-grade"
-          style={{ color: gradeColor, fontWeight: "bold" }}
-        >
-          {result.scores.grade || grade}
-        </p>
-        {result.cached && (
-          <small style={{ color: "#666", fontStyle: "italic" }}>
-            ⚡ Serving cached results (analyzed within last hour)
-          </small>
-        )}
-      </div>
-    );
+  const getGradeColor = (grade) => {
+    if (!grade) return '#6b7280';
+    if (grade.includes('A+')) return '#10b981';
+    if (grade.includes('A')) return '#22c55e';
+    if (grade.includes('B')) return '#3b82f6';
+    if (grade.includes('C')) return '#f59e0b';
+    if (grade.includes('D')) return '#f97316';
+    return '#ef4444';
   };
 
-  const renderCategoryScores = () => {
-    if (!result?.scores?.categoryScores) {
-      return (
-        <div className="categories">
-          <h3>Category Scores</h3>
-          <div className="category-grid">
-            {[
-              "meta",
-              "headings",
-              "images",
-              "links",
-              "content",
-              "technical",
-            ].map((category) => (
-              <div key={category} className="category-item">
-                <h4>{category.charAt(0).toUpperCase() + category.slice(1)}</h4>
-                <div className="category-score">0/100</div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: "0%" }}></div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p style={{ color: "#666", textAlign: "center", marginTop: "10px" }}>
-            No category scores available
-          </p>
-        </div>
-      );
-    }
-
-    const categories = result.scores.categoryScores;
-
-    return (
-      <div className="categories">
-        <h3>Category Scores</h3>
-        <div className="category-grid">
-          {Object.entries(categories).map(([category, score]) => (
-            <div key={category} className="category-item">
-              <h4>{category.charAt(0).toUpperCase() + category.slice(1)}</h4>
-              <div className="category-score">{score}/100</div>
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{
-                    width: `${score}%`,
-                    background:
-                      score >= 70
-                        ? "#28a745"
-                        : score >= 50
-                        ? "#ffc107"
-                        : "#dc3545",
-                  }}
-                ></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const getScoreColor = (score) => {
+    if (score >= 90) return '#10b981';
+    if (score >= 80) return '#22c55e';
+    if (score >= 70) return '#3b82f6';
+    if (score >= 60) return '#f59e0b';
+    if (score >= 50) return '#f97316';
+    return '#ef4444';
   };
 
-  const renderDetailedAnalysis = () => {
-    if (!result?.analysis) {
-      return (
-        <div className="detailed-analysis">
-          <h3>Detailed Analysis</h3>
-          <div className="analysis-section">
-            <div className="analysis-item">
-              <p style={{ textAlign: "center", color: "#666" }}>
-                No analysis data available
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  const getCategoryName = (category) => {
+    const names = {
+      meta: 'Meta Tags',
+      headings: 'Headings',
+      images: 'Images',
+      content: 'Content',
+      links: 'Links',
+      technical: 'Technical SEO',
+      social: 'Social Media',
+      mobile: 'Mobile',
+      security: 'Security'
+    };
+    return names[category] || category;
+  };
 
-    const analysis = result.analysis;
+  const getCategoryIcon = (category) => {
+    const icons = {
+      meta: '🏷️',
+      headings: '📑',
+      images: '🖼️',
+      content: '📝',
+      links: '🔗',
+      technical: '⚙️',
+      social: '📱',
+      mobile: '📱',
+      security: '🔒'
+    };
+    return icons[category] || '📊';
+  };
 
-    return (
-      <div className="detailed-analysis">
-        <h3>Detailed Analysis</h3>
-
-        {/* Meta Tags */}
-        <div className="analysis-section">
-          <h4>Meta Tags</h4>
-          <div className="analysis-item">
-            <div className="meta-tag-analysis">
-              <div className="meta-tag-item">
-                <strong>Title:</strong>{" "}
-                <span
-                  className={
-                    analysis.metaTags?.title?.content
-                      ? "has-content"
-                      : "no-content"
-                  }
-                >
-                  {analysis.metaTags?.title?.content || "Not found"}
-                </span>
-                <div className="meta-tag-stats">
-                  <span className="stat">
-                    Length:{" "}
-                    <strong>{analysis.metaTags?.title?.length || 0}</strong>{" "}
-                    chars
-                  </span>
-                  <span className="stat">
-                    Score:{" "}
-                    <strong>{analysis.metaTags?.title?.score || 0}/100</strong>
-                  </span>
-                </div>
-              </div>
-
-              <div className="meta-tag-item">
-                <strong>Description:</strong>{" "}
-                <span
-                  className={
-                    analysis.metaTags?.description?.content
-                      ? "has-content"
-                      : "no-content"
-                  }
-                >
-                  {analysis.metaTags?.description?.content || "Not found"}
-                </span>
-                <div className="meta-tag-stats">
-                  <span className="stat">
-                    Length:{" "}
-                    <strong>
-                      {analysis.metaTags?.description?.length || 0}
-                    </strong>{" "}
-                    chars
-                  </span>
-                  <span className="stat">
-                    Score:{" "}
-                    <strong>
-                      {analysis.metaTags?.description?.score || 0}/100
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Headings */}
-        <div className="analysis-section">
-          <h4>Headings Structure</h4>
-          <div className="analysis-item">
-            <div className="headings-summary">
-              <div className="summary-item">
-                <span className="summary-label">H1 Count:</span>
-                <span
-                  className={`summary-value ${
-                    analysis.headings?.h1Count === 1 ? "good" : "bad"
-                  }`}
-                >
-                  {analysis.headings?.h1Count || 0}
-                  {analysis.headings?.h1Count === 1
-                    ? " ✅"
-                    : analysis.headings?.h1Count === 0
-                    ? " ❌ (Missing)"
-                    : analysis.headings?.h1Count > 1
-                    ? " ⚠️ (Multiple)"
-                    : ""}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Total Headings:</span>
-                <span className="summary-value">
-                  {analysis.headings?.total || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Structure Score:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.headings?.score || 0) >= 70
-                      ? "good"
-                      : (analysis.headings?.score || 0) >= 50
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.headings?.score || 0}/100
-                </span>
-              </div>
-            </div>
-
-            {analysis.headings?.h1 && analysis.headings.h1.length > 0 && (
-              <div className="headings-list">
-                <strong>H1 Headings:</strong>
-                {analysis.headings.h1.map((item, idx) => (
-                  <div key={idx} className="heading-item">
-                    <span className="heading-tag">H1</span>
-                    <span className="heading-text">
-                      {item.text?.substring(0, 100) || "No text"}...
-                    </span>
-                    <span className="heading-length">
-                      ({item.length || 0} chars)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {analysis.headings?.h2 && analysis.headings.h2.length > 0 && (
-              <div className="headings-list">
-                <strong>H2 Headings ({analysis.headings.h2.length}):</strong>
-                {analysis.headings.h2.slice(0, 3).map((item, idx) => (
-                  <div key={idx} className="heading-item">
-                    <span className="heading-tag">H2</span>
-                    <span className="heading-text">
-                      {item.text?.substring(0, 80) || "No text"}...
-                    </span>
-                    <span className="heading-length">
-                      ({item.length || 0} chars)
-                    </span>
-                  </div>
-                ))}
-                {analysis.headings.h2.length > 3 && (
-                  <div className="heading-item more-items">
-                    ... and {analysis.headings.h2.length - 3} more H2 headings
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Images */}
-        <div className="analysis-section">
-          <h4>Images Analysis</h4>
-          <div className="analysis-item">
-            <div className="images-summary">
-              <div className="summary-item">
-                <span className="summary-label">Total Images:</span>
-                <span className="summary-value">
-                  {analysis.images?.total || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">With Alt Text:</span>
-                <span
-                  className={`summary-value ${
-                    analysis.images?.withAlt === analysis.images?.total
-                      ? "good"
-                      : (analysis.images?.withAlt || 0) > 0
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.images?.withAlt || 0}
-                  {analysis.images?.withAlt === analysis.images?.total
-                    ? " ✅"
-                    : ""}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Without Alt Text:</span>
-                <span
-                  className={`summary-value ${
-                    analysis.images?.withoutAlt ? "bad" : "good"
-                  }`}
-                >
-                  {analysis.images?.withoutAlt || 0}
-                  {analysis.images?.withoutAlt ? " ⚠️" : " ✅"}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Alt Text Ratio:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.images?.altTextRatio || 0) >= 90
-                      ? "good"
-                      : (analysis.images?.altTextRatio || 0) >= 70
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.images?.altTextRatio || 0}%
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Image Score:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.images?.score || 0) >= 80
-                      ? "good"
-                      : (analysis.images?.score || 0) >= 60
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.images?.score || 0}/100
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="analysis-section">
-          <h4>Content Analysis</h4>
-          <div className="analysis-item">
-            <div className="content-summary">
-              <div className="summary-item">
-                <span className="summary-label">Word Count:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.content?.wordCount || 0) >= 500
-                      ? "good"
-                      : (analysis.content?.wordCount || 0) >= 300
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.content?.wordCount || 0}
-                  {(analysis.content?.wordCount || 0) >= 500
-                    ? " ✅"
-                    : (analysis.content?.wordCount || 0) >= 300
-                    ? " ⚠️"
-                    : " ❌"}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Reading Time:</span>
-                <span className="summary-value">
-                  {analysis.content?.readingTime || "N/A"}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Paragraphs:</span>
-                <span className="summary-value">
-                  {analysis.content?.paragraphs || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Readability:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.content?.readability || 0) >= 70
-                      ? "good"
-                      : (analysis.content?.readability || 0) >= 50
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.content?.readability || 0}/100
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Content Score:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.content?.score || 0) >= 70
-                      ? "good"
-                      : (analysis.content?.score || 0) >= 50
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.content?.score || 0}/100
-                </span>
-              </div>
-            </div>
-
-            {analysis.content?.topKeywords &&
-              analysis.content.topKeywords.length > 0 && (
-                <div className="keywords-section">
-                  <strong>Top Keywords:</strong>
-                  <div className="keywords-list">
-                    {analysis.content.topKeywords
-                      .slice(0, 5)
-                      .map((keyword, idx) => (
-                        <span key={idx} className="keyword-tag">
-                          {keyword.word} ({keyword.count})
-                        </span>
-                      ))}
-                  </div>
-                </div>
-              )}
-          </div>
-        </div>
-
-        {/* Technical SEO */}
-        <div className="analysis-section">
-          <h4>Technical SEO</h4>
-          <div className="analysis-item">
-            <div className="technical-grid">
-              <div className="technical-item">
-                <span className="technical-label">HTTPS:</span>
-                <span
-                  className={`technical-value ${
-                    analysis.urlStructure?.isHTTPS ? "good" : "bad"
-                  }`}
-                >
-                  {analysis.urlStructure?.isHTTPS ? "✅ Yes" : "❌ No"}
-                </span>
-              </div>
-
-              <div className="technical-item">
-                <span className="technical-label">Mobile Friendly:</span>
-                <span
-                  className={`technical-value ${
-                    analysis.mobileFriendly?.hasViewport ? "good" : "bad"
-                  }`}
-                >
-                  {analysis.mobileFriendly?.hasViewport ? "✅ Yes" : "❌ No"}
-                </span>
-              </div>
-
-              <div className="technical-item">
-                <span className="technical-label">Page Load Time:</span>
-                <span
-                  className={`technical-value ${
-                    (parseInt(analysis.performance?.loadTime) || 5000) < 2000
-                      ? "good"
-                      : (parseInt(analysis.performance?.loadTime) || 5000) <
-                        4000
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.performance?.loadTime || "N/A"}
-                </span>
-              </div>
-
-              <div className="technical-item">
-                <span className="technical-label">Status Code:</span>
-                <span
-                  className={`technical-value ${
-                    (analysis.performance?.statusCode || 0) === 200
-                      ? "good"
-                      : (analysis.performance?.statusCode || 0) < 400
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.performance?.statusCode || "N/A"}
-                </span>
-              </div>
-
-              <div className="technical-item">
-                <span className="technical-label">Caching:</span>
-                <span
-                  className={`technical-value ${
-                    analysis.performance?.hasCaching ? "good" : "bad"
-                  }`}
-                >
-                  {analysis.performance?.hasCaching ? "✅ Yes" : "❌ No"}
-                </span>
-              </div>
-
-              <div className="technical-item">
-                <span className="technical-label">Compression:</span>
-                <span
-                  className={`technical-value ${
-                    analysis.performance?.hasCompression ? "good" : "bad"
-                  }`}
-                >
-                  {analysis.performance?.hasCompression ? "✅ Yes" : "❌ No"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Links */}
-        <div className="analysis-section">
-          <h4>Links Analysis</h4>
-          <div className="analysis-item">
-            <div className="links-summary">
-              <div className="summary-item">
-                <span className="summary-label">Internal Links:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.links?.internal || 0) >= 10
-                      ? "good"
-                      : (analysis.links?.internal || 0) >= 5
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.links?.internal || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">External Links:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.links?.external || 0) >= 3
-                      ? "good"
-                      : (analysis.links?.external || 0) >= 1
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.links?.external || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Nofollow Links:</span>
-                <span className="summary-value">
-                  {analysis.links?.nofollow || 0}
-                </span>
-              </div>
-
-              <div className="summary-item">
-                <span className="summary-label">Link Score:</span>
-                <span
-                  className={`summary-value ${
-                    (analysis.links?.score || 0) >= 70
-                      ? "good"
-                      : (analysis.links?.score || 0) >= 50
-                      ? "warning"
-                      : "bad"
-                  }`}
-                >
-                  {analysis.links?.score || 0}/100
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        {result.scores?.recommendations &&
-          result.scores.recommendations.length > 0 && (
-            <div className="analysis-section">
-              <h4>Recommendations</h4>
-              <div className="analysis-item recommendations">
-                <ul>
-                  {result.scores.recommendations.slice(0, 8).map((rec, idx) => (
-                    <li key={idx}>
-                      <span className="recommendation-icon">💡</span>
-                      {rec}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-        {/* Strengths & Weaknesses */}
-        {result.scores && (
-          <div className="analysis-section">
-            <h4>SEO Summary</h4>
-            <div className="analysis-item">
-              {result.scores.strengths &&
-                result.scores.strengths.length > 0 && (
-                  <div className="strengths">
-                    <h5 className="summary-title good">
-                      <span className="icon">✅</span> Strengths
-                    </h5>
-                    <div className="tags">
-                      {result.scores.strengths.map((strength, idx) => (
-                        <span key={idx} className="tag good">
-                          {strength}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {result.scores.weaknesses &&
-                result.scores.weaknesses.length > 0 && (
-                  <div className="weaknesses">
-                    <h5 className="summary-title bad">
-                      <span className="icon">⚠️</span> Areas to Improve
-                    </h5>
-                    <div className="tags">
-                      {result.scores.weaknesses.map((weakness, idx) => (
-                        <span key={idx} className="tag bad">
-                          {weakness}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        )}
-
-        {/* Analysis Info */}
-        <div className="analysis-section info-section">
-          <div className="analysis-item">
-            <div className="info-grid">
-              <div className="info-item">
-                <span className="info-label">URL Analyzed:</span>
-                <span className="info-value">{result.url || url}</span>
-              </div>
-
-              <div className="info-item">
-                <span className="info-label">Analysis Time:</span>
-                <span className="info-value">
-                  {result.timestamp
-                    ? new Date(result.timestamp).toLocaleString()
-                    : "Just now"}
-                </span>
-              </div>
-
-              <div className="info-item">
-                <span className="info-label">Cached:</span>
-                <span className="info-value">
-                  {result.cached ? "Yes ⚡" : "No"}
-                </span>
-              </div>
-
-              <div className="info-item">
-                <span className="info-label">Success:</span>
-                <span className="info-value">
-                  {result.success !== false ? "✅ Yes" : "❌ No"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const getIssueLevel = (score) => {
+    if (score >= 80) return { level: 'success', text: 'Good' };
+    if (score >= 60) return { level: 'warning', text: 'Needs Improvement' };
+    return { level: 'error', text: 'Critical' };
   };
 
   return (
-    <div className="app">
-      <header className="header">
-        <h1>🔍 SEO Analyzer Pro</h1>
-        <p>Woorank-like SEO analysis tool | Complete Website Audit</p>
-        <button
-          onClick={testBackendConnection}
-          className="test-btn"
-          title="Test backend connection"
-        >
-          🔌 Test Backend
-        </button>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Navigation Bar */}
+      <nav className="bg-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 flex items-center">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-2 rounded-lg">
+                  <span className="text-xl">🔍</span>
+                </div>
+                <div className="ml-3">
+                  <h1 className="text-xl font-bold text-gray-900">SEO Analyzer Pro</h1>
+                  <p className="text-xs text-gray-600">Professional SEO Analysis Tool</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <a href="https://woorank.com" target="_blank" rel="noopener noreferrer" 
+                className="text-sm text-gray-600 hover:text-gray-900">
+                Compare with Woorank
+              </a>
+              <div className="text-sm text-gray-500">
+                Backend: {API_BASE.replace('http://', '')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
 
-      <main className="main">
-        <div className="analyzer-card">
-          <div className="input-section">
-            <div className="input-group">
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Enter website URL (e.g., https://example.com)"
-                className="url-input"
-                onKeyPress={(e) => e.key === "Enter" && analyzeWebsite()}
-              />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Hero Section */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+          <div className="max-w-3xl">
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">
+              Professional SEO Analysis Like Woorank
+            </h1>
+            <p className="text-blue-100 mb-6">
+              Analyze any website for SEO performance. Get detailed insights on meta tags, 
+              content quality, technical SEO, mobile optimization, and security.
+            </p>
+          </div>
+        </div>
+
+        {/* Input Section */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Analyze Your Website</h2>
+            <p className="text-gray-600">Enter a website URL to get comprehensive SEO analysis</p>
+          </div>
+
+          <form onSubmit={analyzeWebsite} className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none text-lg"
+                  disabled={loading}
+                />
+              </div>
               <button
-                onClick={analyzeWebsite}
+                type="submit"
                 disabled={loading}
-                className="analyze-btn"
+                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {loading ? (
-                  <>
-                    <span className="spinner-small"></span>
+                  <span className="flex items-center justify-center gap-3">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     Analyzing...
-                  </>
+                  </span>
                 ) : (
-                  <>
-                    <span className="icon">🚀</span>
-                    Analyze Website
-                  </>
+                  'Analyze SEO'
                 )}
               </button>
             </div>
 
-            <div className="example-urls">
-              <small>Try: </small>
-              {["example.com", "httpbin.org/html", "github.com"].map(
-                (example) => (
+            {/* Quick Examples */}
+            <div>
+              <p className="text-sm text-gray-600 mb-3">Try these popular websites:</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { url: 'https://google.com', label: 'Google' },
+                  { url: 'https://github.com', label: 'GitHub' },
+                  { url: 'https://stackoverflow.com', label: 'StackOverflow' },
+                  { url: 'https://amazon.com', label: 'Amazon' },
+                  { url: 'https://example.com', label: 'Example' }
+                ].map((example) => (
                   <button
-                    key={example}
-                    onClick={() => setUrl(`https://${example}`)}
-                    className="example-btn"
+                    key={example.url}
+                    type="button"
+                    onClick={() => {
+                      setUrl(example.url);
+                      setError('');
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-sm font-medium transition-colors"
                   >
-                    {example}
+                    {example.label}
                   </button>
-                )
+                ))}
+              </div>
+            </div>
+          </form>
+
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="text-red-600">
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-red-800 font-medium">{error}</p>
+                  <p className="text-red-600 text-sm mt-1">Make sure the backend server is running</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Results Section */}
+        {result && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+            {/* Result Header */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 border-b">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900">SEO Analysis Report</h2>
+                  <div className="mt-2 flex items-center gap-4 flex-wrap">
+                    <p className="text-gray-600 break-all">{result.url}</p>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      {result.domain}
+                    </span>
+                    {result.cached && (
+                      <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        Cached Result
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div 
+                    className="text-5xl md:text-6xl font-bold mb-2"
+                    style={{ color: getGradeColor(result.scores.grade) }}
+                  >
+                    {result.scores.overall}
+                  </div>
+                  <div 
+                    className="text-xl font-bold mb-3 px-6 py-2 rounded-full"
+                    style={{ 
+                      backgroundColor: `${getGradeColor(result.scores.grade)}20`,
+                      color: getGradeColor(result.scores.grade)
+                    }}
+                  >
+                    {result.scores.grade}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Overall SEO Score
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-b">
+              <div className="flex overflow-x-auto">
+                {['overview', 'details', 'recommendations', 'technical'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-6 py-4 font-medium text-sm whitespace-nowrap ${activeTab === tab 
+                      ? 'text-blue-600 border-b-2 border-blue-600' 
+                      : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6">
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <div className="space-y-8">
+                  {/* Score Cards */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">SEO Score Breakdown</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {result.scores.categoryScores && Object.entries(result.scores.categoryScores).map(([category, score]) => {
+                        const issue = getIssueLevel(score);
+                        return (
+                          <div key={category} className="bg-gray-50 p-4 rounded-xl hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xl">{getCategoryIcon(category)}</span>
+                                <span className="font-medium text-gray-900">{getCategoryName(category)}</span>
+                              </div>
+                              <div 
+                                className="text-2xl font-bold"
+                                style={{ color: getScoreColor(score) }}
+                              >
+                                {Math.round(score)}
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                              <div
+                                className="h-2 rounded-full"
+                                style={{ 
+                                  width: `${score}%`,
+                                  backgroundColor: getScoreColor(score)
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                issue.level === 'success' ? 'bg-green-100 text-green-800' :
+                                issue.level === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {issue.text}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {Math.round(score)}/100
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Strengths & Weaknesses */}
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="text-lg font-bold text-green-700 mb-4 flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        Strengths
+                      </h3>
+                      <div className="space-y-3">
+                        {result.strengths?.map((strength, index) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                            <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-gray-800">{strength}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-red-700 mb-4 flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        Areas for Improvement
+                      </h3>
+                      <div className="space-y-3">
+                        {result.weaknesses?.map((weakness, index) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                            <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-gray-800">{weakness}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Details Tab */}
+              {activeTab === 'details' && result.analysis && (
+                <div className="space-y-8">
+                  {/* Meta Information */}
+                  <div className="bg-gray-50 p-6 rounded-xl">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <span className="text-xl">🏷️</span>
+                      Meta Information
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium text-gray-700 mb-2">Title Tag</h4>
+                        <div className="bg-white p-3 rounded-lg border">
+                          <p className="text-gray-800">{result.analysis.meta?.title || 'Not found'}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Length: {result.analysis.meta?.title?.length || 0} characters
+                            {result.analysis.meta?.title?.length >= 30 && result.analysis.meta?.title?.length <= 60 
+                              ? ' ✅ Optimal' 
+                              : ' ⚠️ Should be 30-60 characters'}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-700 mb-2">Meta Description</h4>
+                        <div className="bg-white p-3 rounded-lg border">
+                          <p className="text-gray-800">{result.analysis.meta?.description || 'Not found'}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Length: {result.analysis.meta?.description?.length || 0} characters
+                            {result.analysis.meta?.description?.length >= 120 && result.analysis.meta?.description?.length <= 160 
+                              ? ' ✅ Optimal' 
+                              : ' ⚠️ Should be 120-160 characters'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content Analysis */}
+                  <div className="bg-gray-50 p-6 rounded-xl">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <span className="text-xl">📝</span>
+                      Content Analysis
+                    </h3>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">{result.analysis.content?.wordCount || 0}</div>
+                        <div className="text-gray-700">Word Count</div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {result.analysis.content?.wordCount >= 300 ? '✅ Good' : '⚠️ Add more content'}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">{result.analysis.content?.paragraphs || 0}</div>
+                        <div className="text-gray-700">Paragraphs</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">{result.analysis.headings?.h1 || 0}</div>
+                        <div className="text-gray-700">H1 Headings</div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {result.analysis.headings?.h1 === 1 ? '✅ Perfect' : '⚠️ Should have exactly 1'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Images Analysis */}
+                  <div className="bg-gray-50 p-6 rounded-xl">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <span className="text-xl">🖼️</span>
+                      Images Analysis
+                    </h3>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">{result.analysis.images?.total || 0}</div>
+                        <div className="text-gray-700">Total Images</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-green-600 mb-2">{result.analysis.images?.withAlt || 0}</div>
+                        <div className="text-gray-700">With Alt Text</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-red-600 mb-2">{result.analysis.images?.withoutAlt || 0}</div>
+                        <div className="text-gray-700">Without Alt Text</div>
+                        {result.analysis.images?.withoutAlt > 0 && (
+                          <div className="text-sm text-red-500 mt-1">⚠️ Needs attention</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Recommendations Tab */}
+              {activeTab === 'recommendations' && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">SEO Recommendations</h3>
+                  <div className="space-y-4">
+                    {result.recommendations?.map((rec, index) => (
+                      <div key={index} className="flex items-start gap-4 p-4 bg-blue-50 rounded-xl">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                            {index + 1}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-gray-800">{rec}</p>
+                          <div className="flex gap-2 mt-2">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                              Priority: {index < 2 ? 'High' : index < 4 ? 'Medium' : 'Low'}
+                            </span>
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                              Impact: {index < 2 ? 'High' : 'Medium'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Technical Tab */}
+              {activeTab === 'technical' && result.analysis && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">Technical Details</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Technical SEO */}
+                    <div className="bg-gray-50 p-6 rounded-xl">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                        <span>⚙️</span>
+                        Technical SEO
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">HTTPS</span>
+                          <span className={`font-medium ${result.analysis.technical?.isHTTPS ? 'text-green-600' : 'text-red-600'}`}>
+                            {result.analysis.technical?.isHTTPS ? '✅ Enabled' : '❌ Not Enabled'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Structured Data</span>
+                          <span className={`font-medium ${result.analysis.technical?.hasSchema ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {result.analysis.technical?.hasSchema ? '✅ Found' : '⚠️ Not Found'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Canonical URL</span>
+                          <span className={`font-medium ${result.analysis.technical?.canonical ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {result.analysis.technical?.canonical ? '✅ Set' : '⚠️ Not Set'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Viewport Meta Tag</span>
+                          <span className={`font-medium ${result.analysis.technical?.viewport ? 'text-green-600' : 'text-red-600'}`}>
+                            {result.analysis.technical?.viewport ? '✅ Present' : '❌ Missing'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Links Analysis */}
+                    <div className="bg-gray-50 p-6 rounded-xl">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                        <span>🔗</span>
+                        Links Analysis
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Total Links</span>
+                          <span className="font-medium text-gray-900">{result.analysis.links?.total || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Internal Links</span>
+                          <span className="font-medium text-green-600">{result.analysis.links?.internal || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">External Links</span>
+                          <span className="font-medium text-blue-600">{result.analysis.links?.external || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Social Media */}
+                    <div className="bg-gray-50 p-6 rounded-xl">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                        <span>📱</span>
+                        Social Media
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Open Graph Tags</span>
+                          <span className={`font-medium ${result.analysis.social?.hasOgTags ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {result.analysis.social?.hasOgTags ? '✅ Found' : '⚠️ Not Found'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Twitter Cards</span>
+                          <span className={`font-medium ${result.analysis.social?.hasTwitter ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {result.analysis.social?.hasTwitter ? '✅ Found' : '⚠️ Not Found'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Performance */}
+                    <div className="bg-gray-50 p-6 rounded-xl">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                        <span>🚀</span>
+                        Performance
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Analysis Time</span>
+                          <span className="font-medium text-gray-900">
+                            {result.performance?.fetchTime ? `${result.performance.fetchTime}ms` : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Page Status</span>
+                          <span className="font-medium text-green-600">
+                            {result.performance?.status || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Report Generated</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(result.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
+        )}
 
-          {error && (
-            <div className="error">
-              <div className="error-header">
-                <span className="error-icon">❌</span>
-                <strong>Error</strong>
-              </div>
-              <div className="error-body">
-                {error.split("\n").map((line, idx) => (
-                  <p key={idx} style={{ margin: "5px 0" }}>
-                    {line}
-                  </p>
-                ))}
-              </div>
-              <div className="error-footer">
-                <button onClick={() => setError("")} className="dismiss-btn">
-                  Dismiss
-                </button>
-                <button onClick={testBackendConnection} className="action-btn">
-                  Test Backend
-                </button>
-              </div>
+        {/* History Section */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Recent Analyses</h2>
+            <button 
+              onClick={fetchHistory}
+              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium transition-colors"
+            >
+              Refresh History
+            </button>
+          </div>
+          
+          {history.length > 0 ? (
+            <div className="overflow-hidden rounded-lg border">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Website
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Score
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Grade
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Analyzed
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {history.map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{item.domain}</div>
+                        <div className="text-sm text-gray-500 truncate max-w-xs">{item.url}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div 
+                          className="text-xl font-bold"
+                          style={{ color: getGradeColor(item.grade) }}
+                        >
+                          {item.score}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span 
+                          className="px-3 py-1 rounded-full text-sm font-medium"
+                          style={{ 
+                            backgroundColor: `${getGradeColor(item.grade)}20`,
+                            color: getGradeColor(item.grade)
+                          }}
+                        >
+                          {item.grade}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {new Date(item.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => {
+                            setUrl(item.url);
+                            if (result) {
+                              setResult(null);
+                            }
+                          }}
+                          className="text-blue-600 hover:text-blue-900 font-medium text-sm"
+                        >
+                          Re-analyze
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-
-          {loading && (
-            <div className="loading">
-              <div className="spinner"></div>
-              <h3>Analyzing Website...</h3>
-              <p>This may take 10-30 seconds depending on the website</p>
-              <div className="loading-steps">
-                <div className="step active">Fetching website...</div>
-                <div className="step">Analyzing HTML...</div>
-                <div className="step">Checking SEO elements...</div>
-                <div className="step">Calculating scores...</div>
-                <div className="step">Generating report...</div>
-              </div>
-            </div>
-          )}
-
-          {result && !loading && (
-            <div className="results">
-              <div className="results-header">
-                <h2>SEO Analysis Report</h2>
-                <button onClick={() => window.print()} className="print-btn">
-                  🖨️ Print Report
-                </button>
-              </div>
-
-              {renderScoreCard()}
-              {renderCategoryScores()}
-              {renderDetailedAnalysis()}
-
-              {/* Raw Data Toggle (for debugging) */}
-              <details className="debug-section">
-                <summary>
-                  <span className="debug-icon">🐛</span>
-                  Debug Information (Raw Data)
-                </summary>
-                <div className="debug-content">
-                  <div className="debug-tabs">
-                    <button className="debug-tab active">Response</button>
-                    <button className="debug-tab">Request</button>
-                    <button className="debug-tab">Console</button>
-                  </div>
-                  <pre className="debug-pre">
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
-                </div>
-              </details>
+          ) : (
+            <div className="text-center py-10">
+              <div className="text-gray-400 text-4xl mb-4">📊</div>
+              <p className="text-gray-500">No analysis history yet</p>
+              <p className="text-gray-400 text-sm mt-2">Analyze some websites to see history here</p>
             </div>
           )}
         </div>
       </main>
 
-      <footer className="footer">
-        <div className="footer-content">
-          <div className="footer-section">
-            <h4>🚀 SEO Analyzer Pro</h4>
-            <p>Complete website SEO analysis tool</p>
-            <p>Built with Node.js, React, and MongoDB</p>
+      {/* Footer */}
+      <footer className="bg-white border-t mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">SEO Analyzer Pro</h3>
+              <p className="text-gray-600 text-sm">
+                Professional SEO analysis tool built with Node.js, React, and MongoDB.
+                Provides accurate, Woorank-like analysis for any website.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Features</h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>✅ Real-time SEO analysis</li>
+                <li>✅ 10+ SEO categories checked</li>
+                <li>✅ Professional scoring algorithm</li>
+                <li>✅ Detailed recommendations</li>
+                <li>✅ History tracking</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">API Endpoints</h3>
+              <div className="space-y-2 text-sm">
+                <code className="bg-gray-100 px-2 py-1 rounded text-gray-800">POST /api/analyze</code>
+                <code className="bg-gray-100 px-2 py-1 rounded text-gray-800">GET /api/history</code>
+                <code className="bg-gray-100 px-2 py-1 rounded text-gray-800">GET /health</code>
+              </div>
+            </div>
           </div>
-
-          <div className="footer-section">
-            <h4>⚡ Features</h4>
-            <ul>
-              <li>Full SEO Audit</li>
-              <li>Technical Analysis</li>
-              <li>Performance Check</li>
-              <li>Mobile Optimization</li>
-            </ul>
+          <div className="border-t mt-8 pt-8 text-center text-gray-500 text-sm">
+            <p>SEO Analyzer Pro v2.0 • Built for professional SEO analysis • Not affiliated with Woorank</p>
           </div>
-
-          <div className="footer-section">
-            <h4>ℹ️ Info</h4>
-            <p>Results cached for 1 hour</p>
-            <p>Analysis time: 5-30 seconds</p>
-            <p>Version 1.0.0</p>
-          </div>
-        </div>
-
-        <div className="footer-bottom">
-          <p>© 2024 SEO Analyzer Pro • Made with ❤️ for SEO Optimization</p>
-          <p className="disclaimer">
-            ⚠️ This tool provides SEO recommendations. Always consult with SEO
-            experts for critical decisions.
-          </p>
         </div>
       </footer>
     </div>
